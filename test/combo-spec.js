@@ -12,7 +12,13 @@ function createServer() {
     var app = tianma();
     var server = http.createServer(app.run);
     var root = path.resolve(__dirname, './fixtures');
-    app.use(combo())
+
+    app.use(function *(next){
+            // because of supertest  parse  '??' to '?%3F'
+            this.request.url(decodeURIComponent(this.request.url()));
+            yield next;
+        })
+        .use(combo())
         .static(root)
         .use(function *(next) {
             this.response.status(404);
