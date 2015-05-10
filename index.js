@@ -29,9 +29,12 @@ module.exports = function(delimiter) {
         var req = this.request,
             res = this.response,
             paths,
+            reqpath,
             datum = [];
 
-        if (req.method() === 'GET' && (paths = parseURL(req.path))) {
+        // %3F%3F : ??
+        reqpath = decodeURIComponent(req.path);
+        if (req.method() === 'GET' && (paths = parseURL(reqpath))) {
             for (let i = 0, len = paths.length; i < len; ++i) {
                 req.url(paths[i]);
                 yield next;
