@@ -1,10 +1,10 @@
 {
-	"name": "tianma-combo",
-	"description": "",
-	"version": "1.0.0-b0",
-	"license": "MIT",
-	"engines": {
-		"node": ">=0.12.0"
-	},
-	"main": "index.js"
+    "name": "tianma-combo",
+    "description": "",
+    "version": "1.0.0-b0",
+    "license": "MIT",
+    "engines": {
+        "node": ">=0.12.0"
+    },
+    "main": "index.js"
 }
