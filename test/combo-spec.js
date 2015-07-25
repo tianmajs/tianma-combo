@@ -1,75 +1,144 @@
 'use strict';
 
-var path = require('path');
 var http = require('http');
-var should = require('should');
-var rewire = require('rewire');
+var combo = require('..');
 var request = require('supertest');
 var tianma = require('tianma');
-var combo = rewire('..');
+var path = require('path');
 
-function createServer() {
+var MTIME = {
+    '/foo/bar.txt': 1000,
+    '/foo/baz.txt': 2000
+};
+
+function createApp() {
     var app = tianma();
     var server = http.createServer(app.run);
-    var root = path.resolve(__dirname, './fixtures');
 
-    app.use(function *(next){
-            // because of supertest  parse  '??' to '?%3F'
-            this.request.url(decodeURIComponent(this.request.url()));
-            yield next;
-        })
-        .use(combo())
-        .static(root)
-        .use(function *(next) {
-            this.response.status(404);
-        })
-    return server;
+    app.server = server;
+
+    return app;
 }
 
-describe('combo private method', function(){
-    var parseURL = combo.__get__('parseURL');
+describe('combo()', function () {
+    function createServer() {
+        var app = createApp();
 
-    describe('parseURL()', function(){
-        it('should return null when parsing a normal url', function(){
-            var result = parseURL('/css/6v/apollo/a.css');
-            (result===null).should.be.true;
-        });
+        app.use(combo())
+            .use(function *(next) {
+                var req = this.request;
+                var res = this.response;
+                var extname = path.extname(req.pathname);
+                var mtime = new Date(MTIME[req.pathname] || 0).toGMTString();
 
-        it('should return matched urls when parsing a combo url with parameter', function(){
-            var path = '/css/6v/??apollo/a.css,apollo/b.css?t=100';
-            var result = parseURL(path);
-            result.length.should.equal(2);
-            result[0].should.equal('/css/6v/apollo/a.css?t=100');
-            result[1].should.equal('/css/6v/apollo/b.css?t=100');
-        });
+                switch (extname) {
+                case '.js':
+                case '.css':
+                case '.txt':
+                    res.status(200)
+                        .type(extname)
+                        .head('last-modified', mtime)
+                        .data(req.pathname + (req.query.data || ''));
+                    break;
+                default:
+                    res.status(404);
+                    break;
+                }
+            });
 
-        it('should return matched urls when parsing a combo url without parameter', function(){
-            var path = '/css/6v/??apollo/a.css';
-            var result = parseURL(path);
-            result.length.should.equal(1);
-            result[0].should.equal('/css/6v/apollo/a.css?');
-        });
-    });
-});
+        return app.server;
+    }
 
-describe('combo(pathname)', function () {
-    var server = createServer();
-
-    it('should return all content when parsing exist url', function(done) {
-        var reqpath = '/css/%3F%3Fa.css,b.css'; // /css/??a.css,b.css
-        request(server)
-            .get(reqpath)
-            .expect(/\.a\{\}\s*\.b\{\}/)
+    it('should concat two request', function (done) {
+        request(createServer())
+            .get('/foo/%3F%3Fbar.txt,baz.txt')
+            .expect(200)
+            .expect('content-type', 'text/plain')
+            .expect('/foo/bar.txt/foo/baz.txt')
             .end(done);
     });
 
-    it('should return error pathname when parsing no exist url', function(done){
-        var reqpath = '/css/%3F%3Fa.css,z.css'; // /css/??a.css,z.css
-        request(server)
-            .get(reqpath)
-            // .expect(404)
-            .expect('/css/z.css')
+    it('should offer a default delimiter for js', function (done) {
+        request(createServer())
+            .get('/foo/%3F%3Fbar.js,baz.js')
+            .expect(200)
+            .expect('content-type', 'application/javascript')
+            .expect('/foo/bar.js\n/foo/baz.js\n')
+            .end(done);
+    });
+
+    it('should offer a default delimiter for css', function (done) {
+        request(createServer())
+            .get('/foo/%3F%3Fbar.css,baz.css')
+            .expect(200)
+            .expect('content-type', 'text/css')
+            .expect('/foo/bar.css\n/foo/baz.css\n')
+            .end(done);
+    });
+
+    it('should share the params between sub-request', function (done) {
+        request(createServer())
+            .get('/foo/%3F%3Fbar.txt,baz.txt?data=hello')
+            .expect(200)
+            .expect('/foo/bar.txthello/foo/baz.txthello')
+            .end(done);
+    });
+
+    it('should use the latest mtime', function (done) {
+        request(createServer())
+            .get('/foo/%3F%3Fbar.txt,baz.txt')
+            .expect(200)
+            .expect('last-modified', 'Thu, 01 Jan 1970 00:00:02 GMT')
+            .end(done);
+    });
+
+    it('should fail with a bad sub-request', function (done) {
+        request(createServer())
+            .get('/foo/%3F%3Fbar.js,baz.html')
+            .expect(500)
+            .expect(/to get/)
+            .end(done);
+    });
+
+    it('should fail with mixed file type', function (done) {
+        request(createServer())
+            .get('/foo/%3F%3Fbar.js,baz.css')
+            .expect(500)
+            .expect(/inconsistent/)
             .end(done);
     });
 });
 
+describe('combo(delimiter)', function () {
+    function createServer(delimiter) {
+        var app = createApp();
+
+        app.use(combo(delimiter))
+            .use(function *(next) {
+                this.response
+                    .status(200)
+                    .type('txt')
+                    .data('..');
+            });
+
+        return app.server;
+    }
+
+    it('should support string delimiter', function (done) {
+        request(createServer({ 'text/plain': '\n' }))
+            .get('/foo/%3F%3Fbar,baz')
+            .expect(200)
+            .expect('content-type', 'text/plain')
+            .expect('..\n..\n')
+            .end(done);
+    });
+
+    it('should support buffer delimiter', function (done) {
+        request(createServer({ 'text/plain': new Buffer('|') }))
+            .get('/foo/%3F%3Fbar,baz')
+            .expect(200)
+            .expect('content-type', 'text/plain')
+            .expect('..|..|')
+            .end(done);
+    });
+});

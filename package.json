@@ -1,21 +1,30 @@
 {
     "name": "tianma-combo",
-    "description": "",
-    "version": "1.0.0-b0",
+    "description": "HTTP concat middleware for Tianma",
+    "version": "1.0.0",
+    "author": "Nanqiao Deng <nqdeng@gmail.com>",
+    "keywords": [
+        "combo",
+        "middleware",
+        "tianma"
+    ],
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/tianmajs/tianma-combo.git"
+    },
     "license": "MIT",
+    "devDependencies": {
+        "tianma": "~1.0.0",
+        "mocha": "~2.2.5",
+        "supertest": "~0.15.0"
+    },
     "engines": {
         "node": ">=0.12.0"
     },
     "main": "index.js",
-    "devDependencies": {
-        "tianma": "~1.0.0-r0",
-        "mocha": "^2.2.1",
-        "should": "^3.3.2",
-        "rewire": "^2.3.0",
-        "supertest": "~0.15.0",
-        "tianma-static": "~1.0.0-b2"
-    },
     "scripts": {
         "test": "mocha --harmony"
     }
 }
+
+
