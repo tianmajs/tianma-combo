@@ -39,7 +39,7 @@ module.exports = function (delimiter) {
         var paths, type, mtime;
 
         if (req.method() === 'GET' && (paths = parseURL(original))) {
-            for (let i = 0, len = paths.length; i < len; ++i) {
+            for (var i = 0, len = paths.length; i < len; ++i) {
                 req.url(paths[i]);
 
                 yield next;
